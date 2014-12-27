@@ -1,0 +1,6 @@
+.project
+.settings
+.classpath
+.vagrant
+.DS_Store
+target
