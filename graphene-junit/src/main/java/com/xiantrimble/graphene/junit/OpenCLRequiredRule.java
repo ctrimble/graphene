@@ -20,12 +20,17 @@ public class OpenCLRequiredRule implements TestRule {
 	public static boolean openClAvailable = false;
 	
 	static {
+		try {
     PLATFORM: for( CLPlatform platform : JavaCL.listPlatforms() ) {
     	if( platform.listAllDevices(true).length > 0 ) {
     		openClAvailable = true;
     		break PLATFORM;
     	}
     }
+		}
+		catch( UnsatisfiedLinkError ule ) {
+			System.err.println("OpenCL not available.");
+		}
 	}
 	
 	@Override
