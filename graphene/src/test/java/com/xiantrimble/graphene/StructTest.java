@@ -11,6 +11,7 @@ import java.nio.ByteOrder;
 import org.bridj.Pointer;
 import org.bridj.StructObject;
 import org.bridj.ann.Field;
+import org.junit.ClassRule;
 import org.junit.Test;
 
 import static org.hamcrest.Matchers.*;
@@ -24,6 +25,7 @@ import com.nativelibs4java.opencl.CLQueue;
 import com.nativelibs4java.opencl.JavaCL;
 import com.nativelibs4java.opencl.CLMem.Usage;
 import com.nativelibs4java.util.IOUtils;
+import com.xiantrimble.graphene.junit.OpenCLRequiredRule;
 
 /**
  * A very simple graph scatter and gather implementation using structs.  This example has a single
@@ -43,6 +45,8 @@ import com.nativelibs4java.util.IOUtils;
  *
  */
 public class StructTest {
+	
+	public static @ClassRule OpenCLRequiredRule openClAvailable = new OpenCLRequiredRule();
 	
 	public final static long A = 0;
 	public final static long B = 1;
