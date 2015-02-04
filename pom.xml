@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
-    Copyright (C) 2014 meltmedia (christian.trimble@meltmedia.com)
+    Copyright (C) 2014 Christian Trimble (xiantrimble@gmail.com)
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -233,8 +233,8 @@
             <configuration>
               <property>root.directory</property>
               <project>
-                <groupId>com.meltmedia.dropwizard</groupId>
-                <artifactId>dropwizard-mongo-parent</artifactId>
+                <groupId>com.xiantrimble.graphene</groupId>
+                <artifactId>graphene-parent</artifactId>
               </project>
             </configuration>
           </execution>
