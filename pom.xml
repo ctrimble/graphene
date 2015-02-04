@@ -115,6 +115,11 @@
           <configuration>
             <configFile>${root.directory}/eclipse-formatter-config.xml</configFile>
             <overrideConfigCompilerVersion>true</overrideConfigCompilerVersion>
+            <directories>
+              <directory>${project.build.sourceDirectory}</directory>
+              <directory>${project.build.testSourceDirectory}</directory>
+              <directory>${project.build.directory}/generated-sources</directory>
+            </directories>
           </configuration>
           <dependencies>
             <dependency>
@@ -220,6 +225,11 @@
     </pluginManagement>
     <plugins>
       <plugin>
+        <groupId>com.googlecode.maven-java-formatter-plugin</groupId>
+        <artifactId>maven-java-formatter-plugin</artifactId>
+        <version>0.4</version>
+      </plugin>
+      <plugin>
         <groupId>org.commonjava.maven.plugins</groupId>
         <artifactId>directory-maven-plugin</artifactId>
         <version>0.1</version>
@@ -227,15 +237,11 @@
           <execution>
             <id>directories</id>
             <goals>
-              <goal>directory-of</goal>
+              <goal>highest-basedir</goal>
             </goals>
             <phase>pre-format</phase>
             <configuration>
               <property>root.directory</property>
-              <project>
-                <groupId>com.xiantrimble.graphene</groupId>
-                <artifactId>graphene-parent</artifactId>
-              </project>
             </configuration>
           </execution>
         </executions>
