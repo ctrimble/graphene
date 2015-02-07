@@ -1,0 +1,46 @@
+\#include "./factorial.cl"
+\#include "./multiset_permutation_indices.cl?uniqueElements=${uniqueUnplacedPieces[0]}"
+\#include "./multiset_permutation_elements.cl?elementType=int&uniqueElements=${uniqueUnplacedPieces[0]}"
+
+#ifndef CHESS_PARTITION
+\#define CHESS_PARTITION
+typedef struct {
+  int pieces[64];
+  MultisetEntry_int unplacedPieces[10];
+} ChessPartition;
+#endif
+
+#ifndef CHESS_VALUE
+\#define CHESS_VALUE
+typedef struct {
+  int result;
+  int depth;
+} ChessValue;
+#endif
+
+\#include "./graph_builder_kernel.cl.vm?partitionType=ChessPartition&valueType=ChessValue&constructEdgeFunction=constructChessEdges"
+
+void constructChessEdges(global EdgeConstructionContext_ChessPartition* context, long rangeOffset, global Edge_ChessValue* edges ) {
+	ChessPartition partition = context->partition;
+	
+	// get the index of the position.
+	long index = rangeOffset + context->range.start;
+	
+	// take half of the index, that is the permutation we are on.
+	long permutationIndex = index / 2L;
+	
+	// mod 2 the index, this is the turn.  0 = White, 1 = Black.
+	int turn = index % 2;
+	
+	// expand the piece permutation for the partition.
+	int pieces[${uniqueUnplacedPieces[0]];
+	//PERM_EXPAND_ELEMENTS(CHESS_UNIQUE_UNPLACED_PIECES)(partition.unplacedPieces, )
+	
+	
+	// blend the piece permutation with the board.
+	
+	// start expanding positions.
+	// use the range offset to build the c
+	Edge_ChessValue edge = {.to = rangeOffset, .from = rangeOffset};
+	addEdge(context, rangeOffset, edges, edge);
+}

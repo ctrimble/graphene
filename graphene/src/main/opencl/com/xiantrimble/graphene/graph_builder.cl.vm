@@ -1,0 +1,33 @@
+\#include "./dense_graph.cl.vm?valueType=${valueType[0]}"
+
+#ifndef EDGE_CONSTRUCTION_${partitionType[0]}
+\#define EDGE_CONSTRUCTION_${partitionType[0]}
+typedef struct {
+	IndexRange range;
+	${partitionType[0]} partition;
+	int edgeIndex;
+	int edgesLength;
+	int overflowIndex;
+} EdgeConstructionContext_${partitionType[0]};
+#endif
+
+#ifndef EDGE_CONSTRUCTION_${partitionType[0]}_${valueType[0]}
+\#define EDGE_CONSTRUCTION_${partitionType[0]}_${valueType[0]}
+void addEdge( global EdgeConstructionContext_${partitionType[0]}* context, uint rangeOffset, global Edge_${valueType[0]}* edges, Edge_${valueType[0]} edge );
+#endif
+
+#ifndef EDGE_CONSTRUCTION_${partitionType[0]}_${valueType[0]}_IMPL
+\#define EDGE_CONSTRUCTION_${partitionType[0]}_${valueType[0]}_IMPL
+void addEdge( global EdgeConstructionContext_${partitionType[0]}* context, uint rangeOffset, global Edge_${valueType[0]}* edges, Edge_${valueType[0]} edge ) {
+	int edgeIndex = atomic_add(&context->edgeIndex, 1);
+	
+	// if we have room, then add the edge.
+	if( edgeIndex < context->edgesLength ) {
+		edges[edgeIndex] = edge;
+	}
+	// otherwise, record the index that overflowed.
+	else {
+		atomic_min(&context->overflowIndex, rangeOffset); 
+	}
+}
+#endif
