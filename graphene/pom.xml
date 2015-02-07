@@ -28,18 +28,28 @@
   <name>Graphene</name>
   <dependencies>
     <dependency>
-      <groupId>com.xiantrimble.graphene</groupId>
-      <artifactId>graphene-junit</artifactId>
-      <version>${project.version}</version>
-      <scope>test</scope>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
     </dependency>
     <dependency>
       <groupId>com.nativelibs4java</groupId>
       <artifactId>javacl-core</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.xiantrimble.graphene</groupId>
+      <artifactId>graphene-junit</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
+      <scope>compile</scope>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.velocity</groupId>
+      <artifactId>velocity</artifactId>
     </dependency>
     <dependency>
       <groupId>org.hamcrest</groupId>
