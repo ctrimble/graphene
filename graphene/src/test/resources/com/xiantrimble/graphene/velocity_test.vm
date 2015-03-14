@@ -1,0 +1,7 @@
+#if(!${method})
+no methods
+#else
+#foreach( $methodName in $method )
+method $methodName
+#end
+#end
