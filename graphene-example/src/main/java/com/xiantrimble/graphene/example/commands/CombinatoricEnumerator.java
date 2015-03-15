@@ -32,6 +32,7 @@ import com.nativelibs4java.opencl.CLQueue;
 import com.nativelibs4java.opencl.JavaCL;
 import com.nativelibs4java.opencl.CLMem.Usage;
 import com.nativelibs4java.util.IOUtils;
+import com.xiantrimble.graphene.Ranges;
 
 public class CombinatoricEnumerator<E> {
   public static class Builder<E> {
@@ -200,7 +201,7 @@ public class CombinatoricEnumerator<E> {
     disruptor.start();
 
     // feed ranges into the ring buffer.
-    CombinationsCommand.rangeStream(Range.closedOpen(0L, CombinatoricsUtils.binomialCoefficient(elements.length, k)),
+    Ranges.rangeStream(Range.closedOpen(0L, CombinatoricsUtils.binomialCoefficient(elements.length, k)),
         batchSize).forEach(r -> {
       disruptor.publishEvent((e, s) -> {
         rangeSetter.accept(e, r);

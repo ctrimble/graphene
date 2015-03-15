@@ -28,6 +28,8 @@ import java.util.stream.Collectors;
 import org.bridj.Pointer;
 
 import com.google.common.collect.Lists;
+import com.lmax.disruptor.EventFactory;
+import com.lmax.disruptor.dsl.Disruptor;
 import com.nativelibs4java.opencl.CLBuffer;
 import com.nativelibs4java.opencl.CLContext;
 import com.nativelibs4java.opencl.CLDevice;
@@ -121,6 +123,7 @@ public class Graphene implements Closeable {
 	
 	public class ComputationContext implements Closeable {
 		
+		List<Disruptor<?>> disruptors = Lists.newArrayList();
 		List<DeviceComputationContext> deviceComputationContexts;
 		
 		public ComputationContext() {
@@ -133,9 +136,16 @@ public class Graphene implements Closeable {
 		public List<DeviceComputationContext> getDeviceComputationContexts() {
 			return deviceComputationContexts;
 		}
+
+		public <T> Disruptor<T> createDisruptor(EventFactory<T> eventFactory, int ringBufferSize) {
+	    Disruptor<T> disruptor = new Disruptor<T>(eventFactory, ringBufferSize, getExecutor());
+	    disruptors.add(disruptor);
+	    return disruptor;
+    }
 		
 		@Override
     public void close() {
+	    disruptors.forEach(DisruptorUtils::shutdownDisruptor);
     }
 		
 		public class DeviceComputationContext implements Closeable {

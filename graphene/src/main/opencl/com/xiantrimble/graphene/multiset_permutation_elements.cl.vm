@@ -1,0 +1,49 @@
+\#include "multiset_permutation_indices.cl.vm?uniqueElements=${uniqueElements[0]}"
+
+#set( $prefix = "multiset_permutation_${elementType[0]}_${uniqueElements[0]}" )
+
+#ifndef MULTISET_ENTRY_${elementType[0]}
+\#define MULTISET_ENTRY_${elementType[0]}
+typedef struct {
+  ${elementType[0]} element;
+  int count;
+} MultisetEntry_${elementType[0]};
+#endif
+
+#ifndef MULTISET_PERMUTATION_ELEMENTS_${elementType[0]}_${uniqueElements[0]}
+\#define MULTISET_PERMUTATION_ELEMENTS_${elementType[0]}_${uniqueElements[0]}
+void ${prefix}_expand( MultisetEntry_${elementType[0]}* domain, long index, global int* elements, long subsetSize );
+long ${prefix}_index( MultisetEntry_${elementType[0]}* domain, global int* elements, long subsetSize );
+#endif
+
+#ifndef MULTISET_PERMUTATION_ELEMENTS_${elementType[0]}_${uniqueElements[0]}_IMPL
+\#define MULTISET_PERMUTATION_ELEMENTS_${elementType[0]}_${uniqueElements[0]}_IMPL
+void ${prefix}_expand( MultisetEntry_${elementType[0]}* domain, long index, global ${elementType[0]}* elements, long subsetSize ) { 
+	
+	for( int e = 0; e < subsetSize; e++ ) {
+      // convert to indices.
+      int indices[${uniqueElements[0]}];
+      for( int i = 0; i < ${uniqueElements[0]}; i++ ) {
+        indices[i] = domain[i].count;
+      }
+      int elementIndices[subsetSize];
+      long index = multiset_permutation_elements_${uniqueElements[0]}( indices, elements, subsetSize );
+      // call PERM_EXPAND_INDICES
+	  // map back to elements
+    }
+}
+
+long ${prefix}_index( MultisetEntry_${elementType[0]}* domain, global int* elements, long subsetSize ) {
+	
+	long index = 0;
+		
+		// for each element...
+		for( int e = 0; e < subsetSize; e++ ) {
+		      // convert to indices.
+		      // call PERM_INDEX_INDICES
+			  // return value.
+
+		}
+		return index;
+}
+#endif

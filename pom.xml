@@ -59,9 +59,19 @@
   <dependencyManagement>
     <dependencies>
       <dependency>
-        <groupId>com.google.guava</groupId>
-        <artifactId>guava</artifactId>
-        <version>18.0</version>
+	<groupId>org.apache.velocity</groupId>
+	<artifactId>velocity</artifactId>
+	<version>1.7</version>
+      </dependency>
+      <dependency>
+        <groupId>com.xiantrimble.graphene</groupId>
+        <artifactId>graphene</artifactId>
+        <version>${project.version}</version> 
+      </dependency>
+      <dependency>
+        <groupId>com.xiantrimble.graphene</groupId>
+        <artifactId>graphene-junit</artifactId>
+        <version>${project.version}</version> 
       </dependency>
       <dependency>
         <groupId>com.nativelibs4java</groupId>
@@ -94,6 +104,16 @@
         <version>${io.dropwizard.version}</version>
         <scope>test</scope>
       </dependency>
+<dependency>
+    <groupId>com.google.guava</groupId>
+    <artifactId>guava</artifactId>
+    <version>18.0</version>
+</dependency>
+    <dependency>
+      <groupId>com.lmax</groupId>
+      <artifactId>disruptor</artifactId>
+      <version>3.3.0</version>
+    </dependency>
       <dependency>
         <groupId>junit</groupId>
         <artifactId>junit</artifactId>

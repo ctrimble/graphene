@@ -36,12 +36,6 @@
       <artifactId>javacl-core</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.xiantrimble.graphene</groupId>
-      <artifactId>graphene-junit</artifactId>
-      <version>${project.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <scope>compile</scope>
@@ -50,6 +44,10 @@
     <dependency>
       <groupId>org.apache.velocity</groupId>
       <artifactId>velocity</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.lmax</groupId>
+      <artifactId>disruptor</artifactId>
     </dependency>
     <dependency>
       <groupId>org.hamcrest</groupId>

@@ -40,6 +40,9 @@ import com.nativelibs4java.opencl.CLQueue;
 import com.nativelibs4java.opencl.JavaCL;
 import com.nativelibs4java.opencl.CLMem.Usage;
 import com.nativelibs4java.util.IOUtils;
+import com.xiantrimble.graphene.Graphene.GrapheneDeviceContext;
+import com.xiantrimble.graphene.junit.GrapheneRule;
+import com.xiantrimble.graphene.junit.GrapheneRules;
 import com.xiantrimble.graphene.junit.OpenCLRequiredRule;
 
 /**
@@ -61,7 +64,7 @@ import com.xiantrimble.graphene.junit.OpenCLRequiredRule;
  */
 public class StructTest {
 
-  public static @ClassRule OpenCLRequiredRule openClAvailable = new OpenCLRequiredRule();
+  public static @ClassRule GrapheneRule grapheneSupplier = GrapheneRules.graphene();
 
   public final static long A = 0;
   public final static long B = 1;
@@ -78,16 +81,14 @@ public class StructTest {
     // This should all be coming from the outside.
     int vertexLength = 6;
     int edgeLength = 7;
-
-    CLContext context = JavaCL.createBestContext();
-    CLQueue queue = context.createDefaultQueue();
-    ByteOrder byteOrder = context.getByteOrder();
+    
+    GrapheneDeviceContext graphene = grapheneSupplier.get().getContexts().get(0);
 
     Pointer<VertexStruct> vertexArrayPointer =
-        Pointer.allocateArray(VertexStruct.class, vertexLength).order(byteOrder);
+        Pointer.allocateArray(VertexStruct.class, vertexLength).order(graphene.getByteOrder());
     Pointer<EdgeStruct> edgeArrayPointer =
-        Pointer.allocateArray(EdgeStruct.class, edgeLength).order(byteOrder);
-    Pointer<ContextStruct> contextPointer = Pointer.allocate(ContextStruct.class).order(byteOrder);
+        Pointer.allocateArray(EdgeStruct.class, edgeLength).order(graphene.getByteOrder());
+    Pointer<ContextStruct> contextPointer = Pointer.allocate(ContextStruct.class).order(graphene.getByteOrder());
 
     // a test data set.
     int ei = 0;
@@ -117,13 +118,13 @@ public class StructTest {
     // start OpenCL specific code.
 
     CLBuffer<VertexStruct> vertexBuffer =
-        context.createBuffer(Usage.InputOutput, vertexArrayPointer);
-    CLBuffer<EdgeStruct> edgeBuffer = context.createBuffer(Usage.InputOutput, edgeArrayPointer);
-    CLBuffer<ContextStruct> contextBuffer = context.createBuffer(Usage.InputOutput, contextPointer);
+        graphene.getContext().createBuffer(Usage.InputOutput, vertexArrayPointer);
+    CLBuffer<EdgeStruct> edgeBuffer = graphene.getContext().createBuffer(Usage.InputOutput, edgeArrayPointer);
+    CLBuffer<ContextStruct> contextBuffer = graphene.getContext().createBuffer(Usage.InputOutput, contextPointer);
 
     URL url = StructTest.class.getResource("./test.cl");
     String src = IOUtils.readText(url);
-    CLProgram program = context.createProgram(src);
+    CLProgram program = graphene.getContext().createProgram(src);
 
     CLKernel gatherKernel = program.createKernel("gather");
     CLKernel scatterKernel = program.createKernel("scatter");
@@ -135,26 +136,26 @@ public class StructTest {
     // times if I grouped things by king movement. In other words, if I could
     // easily judge the distance
     // between groups of edges, then loading could be reduced.
-    CLEvent scatterEvent = scatterKernel.enqueueNDRange(queue, new int[] { edgeLength });
+    CLEvent scatterEvent = scatterKernel.enqueueNDRange(graphene.getQueue(), new int[] { edgeLength });
 
     // gather vertex page and edge page pairs.
     // if the edges are sorted by in and do not cross boundaries, then update
     // counts will work.
     // also, the number of read/write operations would be reduced significantly.
     CLEvent gatherEvent =
-        gatherKernel.enqueueNDRange(queue, new int[] { vertexLength }, scatterEvent);
+        gatherKernel.enqueueNDRange(graphene.getQueue(), new int[] { vertexLength }, scatterEvent);
 
     ContextStruct kernelContext;
     for (int i = 0; i < MAX_ROUNDS
-        && (kernelContext = contextBuffer.read(queue, gatherEvent).get()).updates() > 0; i++) {
+        && (kernelContext = contextBuffer.read(graphene.getQueue(), gatherEvent).get()).updates() > 0; i++) {
       System.out.println("Round " + i);
       kernelContext.updates(0);
-      CLEvent contextUpdate = contextBuffer.write(queue, contextPointer, false);
-      scatterEvent = scatterKernel.enqueueNDRange(queue, new int[] { edgeLength }, contextUpdate);
-      gatherEvent = gatherKernel.enqueueNDRange(queue, new int[] { vertexLength }, scatterEvent);
+      CLEvent contextUpdate = contextBuffer.write(graphene.getQueue(), contextPointer, false);
+      scatterEvent = scatterKernel.enqueueNDRange(graphene.getQueue(), new int[] { edgeLength }, contextUpdate);
+      gatherEvent = gatherKernel.enqueueNDRange(graphene.getQueue(), new int[] { vertexLength }, scatterEvent);
     }
 
-    vertexArrayPointer = vertexBuffer.read(queue);
+    vertexArrayPointer = vertexBuffer.read(graphene.getQueue());
 
     assertThat("A distiance updated", vertexArrayPointer.get(A).data(), equalTo(1L));
     assertThat("B distiance updated", vertexArrayPointer.get(B).data(), equalTo(2L));

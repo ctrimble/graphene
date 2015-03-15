@@ -1,0 +1,27 @@
+/*
+ * Structure for describing a dense vertex, vertices are "dense" when their
+ * ID can easily tied directly to their index, without producing a large amount
+ * of waste.
+ * 
+ * Note: This vertex has both the initial value and the current value, used in
+ * iterative problem solving.  This may be improved be seperating these into
+ * two distinct arrays of values.
+ */
+#ifndef DENSE_GRAPH_${valueType[0]}
+\#define DENSE_GRAPH_${valueType[0]}
+typedef struct {
+	${valueType[0]} value;
+	${valueType[0]} initialValue;
+} DenseVertex_${valueType[0]};
+
+/*
+ * Structure for describing an edge.
+ * 
+ * This representation contains a to value, used in iterative problem solving.
+ */
+typedef struct {
+	long to;
+	long from;
+	${valueType[0]} toValue;
+} Edge_${valueType[0]};
+#endif
