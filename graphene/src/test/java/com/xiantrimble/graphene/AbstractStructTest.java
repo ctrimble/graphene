@@ -40,6 +40,9 @@ import com.nativelibs4java.opencl.CLQueue;
 import com.nativelibs4java.opencl.JavaCL;
 import com.nativelibs4java.opencl.CLMem.Usage;
 import com.nativelibs4java.util.IOUtils;
+import com.xiantrimble.graphene.Graphene.GrapheneDeviceContext;
+import com.xiantrimble.graphene.junit.GrapheneRule;
+import com.xiantrimble.graphene.junit.GrapheneRules;
 import com.xiantrimble.graphene.junit.OpenCLRequiredRule;
 
 /**
@@ -77,66 +80,7 @@ import com.xiantrimble.graphene.junit.OpenCLRequiredRule;
  */
 public class AbstractStructTest {
 
-  public static @ClassRule OpenCLRequiredRule openClAvailable = new OpenCLRequiredRule();
-
-  public static abstract class VertexStruct<D extends StructObject> extends StructObject {
-    public static final int VALUE_INDEX = 0;
-    public static final int INITIAL_VALUE_INDEX = 1;
-
-    public VertexStruct() {
-    }
-
-    public VertexStruct(Pointer<? extends StructObject> pointer) {
-      super(pointer);
-    }
-
-    public abstract D value();
-
-    public abstract VertexStruct<D> value(D data);
-
-    public abstract D initialValue();
-
-    public abstract VertexStruct<D> initialValue(D initialValue);
-  }
-
-  public static abstract class EdgeStruct<D extends StructObject> extends StructObject {
-    public static final int TO_INDEX = 0;
-    public static final int FROM_INDEX = 1;
-    public static final int TO_VALUE_INDEX = 2;
-
-    public EdgeStruct() {
-    }
-
-    public EdgeStruct(Pointer<? extends StructObject> pointer) {
-      super(pointer);
-    }
-
-    @Field(TO_INDEX)
-    public long to() {
-      return this.io.getLongField(this, TO_INDEX);
-    };
-
-    @Field(TO_INDEX)
-    public EdgeStruct<D> to(long in) {
-      this.io.setLongField(this, TO_INDEX, in);
-      return this;
-    };
-
-    @Field(FROM_INDEX)
-    public long from() {
-      return this.io.getLongField(this, FROM_INDEX);
-    };
-
-    @Field(FROM_INDEX)
-    public EdgeStruct<D> from(long out) {
-      this.io.setLongField(this, FROM_INDEX, out);
-      return this;
-    };
-
-    public abstract D toValue();
-
-    public abstract EdgeStruct<D> toValue(D toValue);
-  }
+  public static @ClassRule GrapheneRule grapheneSupplier = GrapheneRules.graphene();
 
   public static class DataContext extends StructObject {
     public static final int VERTEX_OFFSET_INDEX = 0;
@@ -224,15 +168,15 @@ public class AbstractStructTest {
     Supplier<URL> resourceSupplier;
     Consumer<GraphSolver<D>> assertResult;
     Consumer<GraphSolver<D>> buildProblem;
-    Class<? extends VertexStruct<D>> vertexType;
-    Class<? extends EdgeStruct<D>> edgeType;
+    Class<? extends AbstractVertexStruct<D>> vertexType;
+    Class<? extends AbstractEdgeStruct<D>> edgeType;
 
     //
     // These must be allocated and defined while building the problem.
     //
-    Pointer<? extends VertexStruct<D>> vertexArrayPointer;
+    Pointer<? extends AbstractVertexStruct<D>> vertexArrayPointer;
     int vertexLength = -1; // this may be in the pointer.
-    Pointer<? extends EdgeStruct<D>> edgeArrayPointer;
+    Pointer<? extends AbstractEdgeStruct<D>> edgeArrayPointer;
     int edgeLength = -1; // this may be in the pointer.
 
     //
@@ -245,9 +189,7 @@ public class AbstractStructTest {
     //
     // Components of the OpenCL API.
     //
-    CLContext context;
-    CLQueue queue;
-    ByteOrder byteOrder;
+    GrapheneDeviceContext deviceContext = grapheneSupplier.get().getContexts().get(0);
 
     public GraphSolver<D> withResourceSupplier(Supplier<URL> resourceSupplier) {
       this.resourceSupplier = resourceSupplier;
@@ -264,57 +206,53 @@ public class AbstractStructTest {
       return this;
     }
 
-    public GraphSolver<D> withVertexType(Class<? extends VertexStruct<D>> vertexType) {
+    public GraphSolver<D> withVertexType(Class<? extends AbstractVertexStruct<D>> vertexType) {
       this.vertexType = vertexType;
       return this;
     }
 
-    public GraphSolver<D> withEdgeType(Class<? extends EdgeStruct<D>> edgeType) {
+    public GraphSolver<D> withEdgeType(Class<? extends AbstractEdgeStruct<D>> edgeType) {
       this.edgeType = edgeType;
       return this;
     }
 
-    public Pointer<? extends VertexStruct<D>> allocateVertices(int vertexLength) {
+    public Pointer<? extends AbstractVertexStruct<D>> allocateVertices(int vertexLength) {
       this.vertexLength = vertexLength;
       contextPointer.get().vertexLength(vertexLength);
-      return vertexArrayPointer = Pointer.allocateArray(vertexType, vertexLength).order(byteOrder);
+      return vertexArrayPointer = Pointer.allocateArray(vertexType, vertexLength).order(deviceContext.getByteOrder());
     }
 
-    public Pointer<? extends EdgeStruct<D>> allocateEdges(int edgeLength) {
+    public Pointer<? extends AbstractEdgeStruct<D>> allocateEdges(int edgeLength) {
       this.edgeLength = edgeLength;
       contextPointer.get().edgeLength(edgeLength);
-      return edgeArrayPointer = Pointer.allocateArray(edgeType, edgeLength).order(byteOrder);
+      return edgeArrayPointer = Pointer.allocateArray(edgeType, edgeLength).order(deviceContext.getByteOrder());
     }
 
     public void doTest() throws IOException {
 
-      context = JavaCL.createBestContext();
-      queue = context.createDefaultQueue();
-      byteOrder = context.getByteOrder();
-
-      contextPointer = Pointer.allocate(DataContext.class).order(byteOrder);
-      computeContextPointer = Pointer.allocate(ComputeContext.class).order(byteOrder);
+      contextPointer = Pointer.allocate(DataContext.class).order(deviceContext.getByteOrder());
+      computeContextPointer = Pointer.allocate(ComputeContext.class).order(deviceContext.getByteOrder());
 
       contextPointer.get().vertexOffset(0);
       computeContextPointer.get().updates(0);
       buildProblem.accept(this);
 
-      CLBuffer<? extends VertexStruct<D>> vertexBuffer =
-          context.createBuffer(Usage.InputOutput, vertexArrayPointer);
-      CLBuffer<? extends EdgeStruct<D>> edgeBuffer =
-          context.createBuffer(Usage.InputOutput, edgeArrayPointer);
-      CLBuffer<DataContext> contextBuffer = context.createBuffer(Usage.InputOutput, contextPointer);
+      CLBuffer<? extends AbstractVertexStruct<D>> vertexBuffer =
+          deviceContext.getContext().createBuffer(Usage.InputOutput, vertexArrayPointer);
+      CLBuffer<? extends AbstractEdgeStruct<D>> edgeBuffer =
+      		deviceContext.getContext().createBuffer(Usage.InputOutput, edgeArrayPointer);
+      CLBuffer<DataContext> contextBuffer = deviceContext.getContext().createBuffer(Usage.InputOutput, contextPointer);
       CLBuffer<ComputeContext> computeContextBuffer =
-          context.createBuffer(Usage.InputOutput, computeContextPointer);
+      		deviceContext.getContext().createBuffer(Usage.InputOutput, computeContextPointer);
 
       CLProgram program;
       if (resourceSupplier != null) {
         program =
-            context.createProgram(IOUtils.readText(resourceSupplier.get()),
+        		deviceContext.getContext().createProgram(IOUtils.readText(resourceSupplier.get()),
                 IOUtils.readText(AbstractStructTest.class.getResource("./generic_data_test.cl")));
       } else {
         program =
-            context.createProgram(IOUtils.readText(AbstractStructTest.class
+        		deviceContext.getContext().createProgram(IOUtils.readText(AbstractStructTest.class
                 .getResource("./generic_data_test.cl")));
       }
 
@@ -323,23 +261,23 @@ public class AbstractStructTest {
       gatherKernel.setArgs(computeContextBuffer, contextBuffer, vertexBuffer, edgeBuffer);
       scatterKernel.setArgs(computeContextBuffer, contextBuffer, vertexBuffer, edgeBuffer);
 
-      CLEvent scatterEvent = scatterKernel.enqueueNDRange(queue, new int[] { edgeLength });
+      CLEvent scatterEvent = scatterKernel.enqueueNDRange(deviceContext.getQueue(), new int[] { edgeLength });
 
       CLEvent gatherEvent =
-          gatherKernel.enqueueNDRange(queue, new int[] { vertexLength }, scatterEvent);
+          gatherKernel.enqueueNDRange(deviceContext.getQueue(), new int[] { vertexLength }, scatterEvent);
 
       ComputeContext kernelContext;
       for (int i = 0; i < MAX_ROUNDS
-          && (kernelContext = computeContextBuffer.read(queue, gatherEvent).get()).updates() > 0; i++) {
+          && (kernelContext = computeContextBuffer.read(deviceContext.getQueue(), gatherEvent).get()).updates() > 0; i++) {
         System.out.println("Round " + i);
         // release previous round resources
         scatterEvent.release();
         gatherEvent.release();
 
         kernelContext.updates(0);
-        CLEvent contextUpdate = computeContextBuffer.write(queue, computeContextPointer, false);
-        scatterEvent = scatterKernel.enqueueNDRange(queue, new int[] { edgeLength }, contextUpdate);
-        gatherEvent = gatherKernel.enqueueNDRange(queue, new int[] { vertexLength }, scatterEvent);
+        CLEvent contextUpdate = computeContextBuffer.write(deviceContext.getQueue(), computeContextPointer, false);
+        scatterEvent = scatterKernel.enqueueNDRange(deviceContext.getQueue(), new int[] { edgeLength }, contextUpdate);
+        gatherEvent = gatherKernel.enqueueNDRange(deviceContext.getQueue(), new int[] { vertexLength }, scatterEvent);
 
         // release resources.
         contextUpdate.release();
@@ -348,7 +286,7 @@ public class AbstractStructTest {
       scatterEvent.release();
       gatherEvent.release();
 
-      vertexArrayPointer = vertexBuffer.read(queue);
+      vertexArrayPointer = vertexBuffer.read(deviceContext.getQueue());
 
       assertResult.accept(this);
 
@@ -370,10 +308,6 @@ public class AbstractStructTest {
       edgeArrayPointer.release();
       contextPointer.release();
       computeContextPointer.release();
-
-      // release the context.
-      queue.release();
-      context.release();
     }
   }
 
@@ -392,7 +326,7 @@ public class AbstractStructTest {
   public final static long I = 8;
   public final static long J = 9;
 
-  public static <T extends StructObject> void initVertex(VertexStruct<T> vertexStruct, T value,
+  public static <T extends StructObject> void initVertex(AbstractVertexStruct<T> vertexStruct, T value,
       T initialValue) {
     vertexStruct.value(value).initialValue(initialValue);
   }
@@ -422,7 +356,7 @@ public class AbstractStructTest {
     }
   }
 
-  public static class DefaultVertex extends VertexStruct<DefaultValue> {
+  public static class DefaultVertex extends AbstractVertexStruct<DefaultValue> {
 
     @Field(VALUE_INDEX)
     public DefaultValue value() {
@@ -430,7 +364,7 @@ public class AbstractStructTest {
     };
 
     @Field(VALUE_INDEX)
-    public VertexStruct<DefaultValue> value(DefaultValue data) {
+    public AbstractVertexStruct<DefaultValue> value(DefaultValue data) {
       this.io.setNativeObjectField(this, VALUE_INDEX, data);
       return this;
     };
@@ -441,20 +375,20 @@ public class AbstractStructTest {
     };
 
     @Field(INITIAL_VALUE_INDEX)
-    public VertexStruct<DefaultValue> initialValue(DefaultValue initialValue) {
+    public AbstractVertexStruct<DefaultValue> initialValue(DefaultValue initialValue) {
       this.io.setNativeObjectField(this, INITIAL_VALUE_INDEX, initialValue);
       return this;
     };
   }
 
-  public static class DefaultEdge extends EdgeStruct<DefaultValue> {
+  public static class DefaultEdge extends AbstractEdgeStruct<DefaultValue> {
     @Field(TO_VALUE_INDEX)
     public DefaultValue toValue() {
       return this.io.getNativeObjectField(this, TO_VALUE_INDEX);
     };
 
     @Field(TO_VALUE_INDEX)
-    public EdgeStruct<DefaultValue> toValue(DefaultValue toValue) {
+    public AbstractEdgeStruct<DefaultValue> toValue(DefaultValue toValue) {
       this.io.setNativeObjectField(this, TO_VALUE_INDEX, toValue);
       return this;
     };
@@ -470,8 +404,8 @@ public class AbstractStructTest {
         .withVertexType(DefaultVertex.class)
         .withEdgeType(DefaultEdge.class)
         .withBuildProblem(gs -> {
-          Pointer<? extends VertexStruct<DefaultValue>> vertexArray = gs.allocateVertices(6);
-          Pointer<? extends EdgeStruct<DefaultValue>> edgeArray = gs.allocateEdges(7);
+          Pointer<? extends AbstractVertexStruct<DefaultValue>> vertexArray = gs.allocateVertices(6);
+          Pointer<? extends AbstractEdgeStruct<DefaultValue>> edgeArray = gs.allocateEdges(7);
 
           // test vertices
             initVertex(vertexArray.get(A), defaultValue(1), defaultValue(1));
@@ -522,91 +456,6 @@ public class AbstractStructTest {
   public static final int LOSS = 1;
   public static final int UNDEFINED = 0;
 
-  public static class CustomValue extends StructObject {
-    public static final int RESULT_INDEX = 0;
-    public static final int DEPTH_INDEX = 1;
-
-    public CustomValue() {
-    }
-
-    public CustomValue(Pointer<? extends StructObject> pointer) {
-      super(pointer);
-    }
-
-    @Field(RESULT_INDEX)
-    public int result() {
-      return this.io.getIntField(this, RESULT_INDEX);
-    }
-
-    @Field(RESULT_INDEX)
-    public CustomValue result(int result) {
-      this.io.setIntField(this, RESULT_INDEX, result);
-      return this;
-    }
-
-    @Field(DEPTH_INDEX)
-    public int depth() {
-      return this.io.getIntField(this, DEPTH_INDEX);
-    }
-
-    @Field(DEPTH_INDEX)
-    public CustomValue depth(int depth) {
-      this.io.setIntField(this, DEPTH_INDEX, depth);
-      return this;
-    }
-  }
-
-  public static class CustomVertex extends VertexStruct<CustomValue> {
-    public CustomVertex() {
-    }
-
-    public CustomVertex(Pointer<? extends StructObject> pointer) {
-      super(pointer);
-    }
-
-    @Field(VALUE_INDEX)
-    public CustomValue value() {
-      return this.io.getNativeObjectField(this, VALUE_INDEX);
-    };
-
-    @Field(VALUE_INDEX)
-    public VertexStruct<CustomValue> value(CustomValue data) {
-      this.io.setNativeObjectField(this, VALUE_INDEX, data);
-      return this;
-    };
-
-    @Field(INITIAL_VALUE_INDEX)
-    public CustomValue initialValue() {
-      return this.io.getNativeObjectField(this, INITIAL_VALUE_INDEX);
-    };
-
-    @Field(INITIAL_VALUE_INDEX)
-    public VertexStruct<CustomValue> initialValue(CustomValue initialValue) {
-      this.io.setNativeObjectField(this, INITIAL_VALUE_INDEX, initialValue);
-      return this;
-    };
-  }
-
-  public static class CustomEdge extends EdgeStruct<CustomValue> {
-    public CustomEdge() {
-    }
-
-    public CustomEdge(Pointer<? extends StructObject> pointer) {
-      super(pointer);
-    }
-
-    @Field(TO_VALUE_INDEX)
-    public CustomValue toValue() {
-      return this.io.getNativeObjectField(this, TO_VALUE_INDEX);
-    };
-
-    @Field(TO_VALUE_INDEX)
-    public EdgeStruct<CustomValue> toValue(CustomValue toValue) {
-      this.io.setNativeObjectField(this, TO_VALUE_INDEX, toValue);
-      return this;
-    };
-  }
-
   public static CustomValue customValue(int result, int depth) {
     return new CustomValue().result(result).depth(depth);
   }
@@ -618,8 +467,8 @@ public class AbstractStructTest {
         .withVertexType(CustomVertex.class)
         .withEdgeType(CustomEdge.class)
         .withBuildProblem(gs -> {
-          Pointer<? extends VertexStruct<CustomValue>> vertexArray = gs.allocateVertices(10);
-          Pointer<? extends EdgeStruct<CustomValue>> edgeArray = gs.allocateEdges(11);
+          Pointer<? extends AbstractVertexStruct<CustomValue>> vertexArray = gs.allocateVertices(10);
+          Pointer<? extends AbstractEdgeStruct<CustomValue>> edgeArray = gs.allocateEdges(11);
 
           // test vertices
             initVertex(vertexArray.get(A), customValue(LOSS, 0), customValue(LOSS, 0));

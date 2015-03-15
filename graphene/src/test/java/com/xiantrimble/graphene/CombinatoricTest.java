@@ -15,43 +15,49 @@
  */
 package com.xiantrimble.graphene;
 
-import static org.junit.Assert.*;
-import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.equalTo;
+import static org.junit.Assert.assertThat;
 
 import java.io.IOException;
 import java.net.URL;
-import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 import org.bridj.Pointer;
 import org.bridj.StructObject;
-import org.bridj.ann.Array;
 import org.bridj.ann.Field;
+import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
 
 import com.nativelibs4java.opencl.CLBuffer;
-import com.nativelibs4java.opencl.CLContext;
 import com.nativelibs4java.opencl.CLEvent;
 import com.nativelibs4java.opencl.CLKernel;
-import com.nativelibs4java.opencl.CLProgram;
-import com.nativelibs4java.opencl.CLQueue;
-import com.nativelibs4java.opencl.JavaCL;
 import com.nativelibs4java.opencl.CLMem.Usage;
+import com.nativelibs4java.opencl.CLProgram;
 import com.nativelibs4java.util.IOUtils;
-import com.xiantrimble.graphene.AbstractStructTest.ComputeContext;
-import com.xiantrimble.graphene.AbstractStructTest.DataContext;
-import com.xiantrimble.graphene.AbstractStructTest.EdgeStruct;
-import com.xiantrimble.graphene.AbstractStructTest.GraphSolver;
-import com.xiantrimble.graphene.AbstractStructTest.VertexStruct;
-import com.xiantrimble.graphene.junit.OpenCLRequiredRule;
+import com.xiantrimble.graphene.Graphene.GrapheneDeviceContext;
+import com.xiantrimble.graphene.junit.GrapheneRule;
+import com.xiantrimble.graphene.junit.GrapheneRules;
+import com.xiantrimble.graphene.source.IncludeResolvers;
+import com.xiantrimble.graphene.source.SourcesBuilder;
+import com.xiantrimble.graphene.source.Uris;
 
 public class CombinatoricTest {
 
-  public static @ClassRule OpenCLRequiredRule openClAvailable = new OpenCLRequiredRule();
+  public static @ClassRule GrapheneRule grapheneSupplier = GrapheneRules.graphene();
+  
+  public static Supplier<SourcesBuilder> sourcesBuilderSupplier;
+  
+  @BeforeClass
+  public static void staticSetUp() {
+  	sourcesBuilderSupplier = SourcesBuilder.builder()
+  			.withIncludeResolver(IncludeResolvers.defaultResolver())
+  			.withBaseUri(Uris.uriStringFor(CombinatoricTest.class))
+  			::build;
+  }
 
   public static class BinomialCoefficientContext extends StructObject {
     public static final int MAX_UNIQUE_ELEMENTS = 256;
@@ -109,13 +115,11 @@ public class CombinatoricTest {
     // computation. Managed by the solver.
     //
     Pointer<BinomialCoefficientContext> contextPointer;
-
+    
     //
     // Components of the OpenCL API.
     //
-    CLContext context;
-    CLQueue queue;
-    ByteOrder byteOrder;
+    GrapheneDeviceContext deviceContext = grapheneSupplier.get().getContexts().get(0);
 
     public BinomialCoefficientTable withNOffset(int nOffset) {
       this.nOffset = nOffset;
@@ -144,33 +148,27 @@ public class CombinatoricTest {
 
     public void doTest() throws IOException {
 
-      context = JavaCL.createBestContext();
-      queue = context.createDefaultQueue();
-      byteOrder = context.getByteOrder();
-
-      contextPointer = Pointer.allocate(BinomialCoefficientContext.class).order(byteOrder);
-      resultPointer = Pointer.allocateLongs(nLength * kLength).order(byteOrder);
+      contextPointer = Pointer.allocate(BinomialCoefficientContext.class).order(deviceContext.getByteOrder());
+      resultPointer = Pointer.allocateLongs(nLength * kLength).order(deviceContext.getByteOrder());
 
       contextPointer.set(new BinomialCoefficientContext().nOffset(nOffset).kOffset(kOffset));
 
-      CLBuffer<Long> resultBuffer = context.createBuffer(Usage.InputOutput, resultPointer);
+      CLBuffer<Long> resultBuffer = deviceContext.getContext().createBuffer(Usage.InputOutput, resultPointer);
       CLBuffer<BinomialCoefficientContext> contextBuffer =
-          context.createBuffer(Usage.InputOutput, contextPointer);
+          deviceContext.getContext().createBuffer(Usage.InputOutput, contextPointer);
 
       CLProgram program =
-          context.createProgram(IOUtils.readText(AbstractStructTest.class
+          deviceContext.getContext().createProgram(IOUtils.readText(AbstractStructTest.class
               .getResource("./combinatoric.cl")));
 
       CLKernel expandKernel = program.createKernel("binomial_coefficient_table");
       expandKernel.setArgs(contextBuffer, resultBuffer);
 
-      CLEvent expandEvent = expandKernel.enqueueNDRange(queue, new int[] { nLength, kLength });
+      CLEvent expandEvent = expandKernel.enqueueNDRange(deviceContext.getQueue(), new int[] { nLength, kLength });
 
-      resultPointer = resultBuffer.read(queue, expandEvent);
+      resultPointer = resultBuffer.read(deviceContext.getQueue(), expandEvent);
 
       assertResult.accept(this);
-
-      context.release();
     }
 
     public Long getResult(int n, int k) {
@@ -288,9 +286,7 @@ public class CombinatoricTest {
     //
     // Components of the OpenCL API.
     //
-    CLContext context;
-    CLQueue queue;
-    ByteOrder byteOrder;
+    GrapheneDeviceContext deviceContext = grapheneSupplier.get().getContexts().get(0);
 
     public CombinationTransition withFunction(String function) {
       this.function = function;
@@ -314,40 +310,34 @@ public class CombinatoricTest {
 
     public void doTest() throws IOException {
 
-      context = JavaCL.createBestContext();
-      queue = context.createDefaultQueue();
-      byteOrder = context.getByteOrder();
-
-      contextPointer = Pointer.allocate(CombinatoricContext.class).order(byteOrder);
-      indicePointer = Pointer.allocateLongs(problemContext.size()).order(byteOrder);
+      contextPointer = Pointer.allocate(CombinatoricContext.class).order(deviceContext.getByteOrder());
+      indicePointer = Pointer.allocateLongs(problemContext.size()).order(deviceContext.getByteOrder());
       elementPointer =
           Pointer.allocateInts(problemContext.size() * problemContext.subsetSize())
-              .order(byteOrder);
+              .order(deviceContext.getByteOrder());
 
       contextPointer.set(problemContext);
 
       buildProblem.accept(getThis());
 
-      CLBuffer<Long> indiceBuffer = context.createBuffer(Usage.InputOutput, indicePointer);
-      CLBuffer<Integer> elementBuffer = context.createBuffer(Usage.InputOutput, elementPointer);
+      CLBuffer<Long> indiceBuffer = deviceContext.getContext().createBuffer(Usage.InputOutput, indicePointer);
+      CLBuffer<Integer> elementBuffer = deviceContext.getContext().createBuffer(Usage.InputOutput, elementPointer);
       CLBuffer<CombinatoricContext> contextBuffer =
-          context.createBuffer(Usage.InputOutput, contextPointer);
+          deviceContext.getContext().createBuffer(Usage.InputOutput, contextPointer);
 
       CLProgram program =
-          context.createProgram(IOUtils.readText(AbstractStructTest.class
+          deviceContext.getContext().createProgram(IOUtils.readText(AbstractStructTest.class
               .getResource("./combinatoric.cl")));
 
       CLKernel combKernel = program.createKernel(function);
       combKernel.setArgs(contextBuffer, indiceBuffer, elementBuffer);
 
-      CLEvent executeEvent = combKernel.enqueueNDRange(queue, new int[] { problemContext.size() });
+      CLEvent executeEvent = combKernel.enqueueNDRange(deviceContext.getQueue(), new int[] { problemContext.size() });
 
-      elementPointer = elementBuffer.read(queue, executeEvent);
-      indicePointer = indiceBuffer.read(queue, executeEvent);
+      elementPointer = elementBuffer.read(deviceContext.getQueue(), executeEvent);
+      indicePointer = indiceBuffer.read(deviceContext.getQueue(), executeEvent);
 
       assertResult.accept(getThis());
-
-      context.release();
     }
 
     public int[] subset(int index) {
@@ -480,9 +470,7 @@ public class CombinatoricTest {
     //
     // Components of the OpenCL API.
     //
-    CLContext context;
-    CLQueue queue;
-    ByteOrder byteOrder;
+    GrapheneDeviceContext deviceContext = grapheneSupplier.get().getContexts().get(0);
 
     public PermutationTransition withFunction(String function) {
       this.function = function;
@@ -511,44 +499,40 @@ public class CombinatoricTest {
 
     public void doTest() throws IOException {
 
-      context = JavaCL.createBestContext();
-      queue = context.createDefaultQueue();
-      byteOrder = context.getByteOrder();
-
-      contextPointer = Pointer.allocate(CombinatoricContext.class).order(byteOrder);
-      indicePointer = Pointer.allocateLongs(problemContext.size()).order(byteOrder);
-      elementsPointer = Pointer.allocateInts(problemContext.subsetSize()).order(byteOrder);
+      contextPointer = Pointer.allocate(CombinatoricContext.class).order(deviceContext.getByteOrder());
+      indicePointer = Pointer.allocateLongs(problemContext.size()).order(deviceContext.getByteOrder());
+      elementsPointer = Pointer.allocateInts(problemContext.subsetSize()).order(deviceContext.getByteOrder());
       elementPointer =
           Pointer.allocateInts(problemContext.size() * problemContext.subsetSize())
-              .order(byteOrder);
+              .order(deviceContext.getByteOrder());
 
       contextPointer.set(problemContext);
       elementsPointer.setInts(elementCounts);
 
       buildProblem.accept(getThis());
 
-      CLBuffer<Long> indiceBuffer = context.createBuffer(Usage.InputOutput, indicePointer);
-      CLBuffer<Integer> elementBuffer = context.createBuffer(Usage.InputOutput, elementPointer);
+      CLBuffer<Long> indiceBuffer = deviceContext.getContext().createBuffer(Usage.InputOutput, indicePointer);
+      CLBuffer<Integer> elementBuffer = deviceContext.getContext().createBuffer(Usage.InputOutput, elementPointer);
       CLBuffer<CombinatoricContext> contextBuffer =
-          context.createBuffer(Usage.InputOutput, contextPointer);
-      CLBuffer<Integer> elementsBuffer = context.createBuffer(Usage.Input, elementsPointer);
-
+          deviceContext.getContext().createBuffer(Usage.InputOutput, contextPointer);
+      CLBuffer<Integer> elementsBuffer = deviceContext.getContext().createBuffer(Usage.Input, elementsPointer);
+      
       CLProgram program =
-          context.createProgram(
-              "#define PERM_UNIQUE_ELEMENTS " + this.problemContext.uniqueElements() + "\n",
-              IOUtils.readText(AbstractStructTest.class.getResource("./multiset_permutations.cl")));
+          deviceContext.getContext().createProgram(
+          		sourcesBuilderSupplier
+        		  .get()
+        		  .addUri("./multiset_permutation_kernels.cl.vm?uniqueElements="+problemContext.uniqueElements())
+        		  .build());
 
       CLKernel combKernel = program.createKernel(function);
       combKernel.setArgs(contextBuffer, elementsBuffer, indiceBuffer, elementBuffer);
 
-      CLEvent executeEvent = combKernel.enqueueNDRange(queue, new int[] { problemContext.size() });
+      CLEvent executeEvent = combKernel.enqueueNDRange(deviceContext.getQueue(), new int[] { problemContext.size() });
 
-      elementPointer = elementBuffer.read(queue, executeEvent);
-      indicePointer = indiceBuffer.read(queue, executeEvent);
+      elementPointer = elementBuffer.read(deviceContext.getQueue(), executeEvent);
+      indicePointer = indiceBuffer.read(deviceContext.getQueue(), executeEvent);
 
       assertResult.accept(getThis());
-
-      context.release();
     }
 
     public int[] subset(int index) {
@@ -730,9 +714,7 @@ public class CombinatoricTest {
     //
     // Components of the OpenCL API.
     //
-    CLContext context;
-    CLQueue queue;
-    ByteOrder byteOrder;
+    GrapheneDeviceContext deviceContext = grapheneSupplier.get().getContexts().get(0);
 
     public PermutationSizeTable withContext(PermutationSizeContext problemContext) {
       this.problemContext = problemContext;
@@ -751,40 +733,36 @@ public class CombinatoricTest {
 
     public void doTest() throws IOException {
 
-      context = JavaCL.createBestContext();
-      queue = context.createDefaultQueue();
-      byteOrder = context.getByteOrder();
-
-      contextPointer = Pointer.allocate(PermutationSizeContext.class).order(byteOrder);
+      contextPointer = Pointer.allocate(PermutationSizeContext.class).order(deviceContext.getByteOrder());
       domainPointer =
           Pointer.allocateInts(problemContext.size() * problemContext.uniqueElements()).order(
-              byteOrder);
-      resultPointer = Pointer.allocateLongs(problemContext.size()).order(byteOrder);
+              deviceContext.getByteOrder());
+      resultPointer = Pointer.allocateLongs(problemContext.size()).order(deviceContext.getByteOrder());
 
       contextPointer.set(problemContext);
 
       buildProblem.accept(this);
 
-      CLBuffer<Integer> domainBuffer = context.createBuffer(Usage.Input, domainPointer);
-      CLBuffer<Long> resultBuffer = context.createBuffer(Usage.InputOutput, resultPointer);
+      CLBuffer<Integer> domainBuffer = deviceContext.getContext().createBuffer(Usage.Input, domainPointer);
+      CLBuffer<Long> resultBuffer = deviceContext.getContext().createBuffer(Usage.InputOutput, resultPointer);
       CLBuffer<PermutationSizeContext> contextBuffer =
-          context.createBuffer(Usage.InputOutput, contextPointer);
+          deviceContext.getContext().createBuffer(Usage.InputOutput, contextPointer);
 
       CLProgram program =
-          context.createProgram(
-              "#define PERM_UNIQUE_ELEMENTS " + this.problemContext.uniqueElements() + "\n",
-              IOUtils.readText(AbstractStructTest.class.getResource("./multiset_permutations.cl")));
+          deviceContext.getContext().createProgram(
+          		sourcesBuilderSupplier
+        		  .get()
+        		  .addUri("./multiset_permutation_kernels.cl.vm?uniqueElements="+problemContext.uniqueElements())
+        		  .build());
 
-      CLKernel expandKernel = program.createKernel("compute_permutation_sizes");
+      CLKernel expandKernel = program.createKernel("multiset_permutation_sizes");
       expandKernel.setArgs(contextBuffer, domainBuffer, resultBuffer);
 
-      CLEvent expandEvent = expandKernel.enqueueNDRange(queue, new int[] { problemContext.size() });
+      CLEvent expandEvent = expandKernel.enqueueNDRange(deviceContext.getQueue(), new int[] { problemContext.size() });
 
-      resultPointer = resultBuffer.read(queue, expandEvent);
+      resultPointer = resultBuffer.read(deviceContext.getQueue(), expandEvent);
 
       assertResult.accept(this);
-
-      context.release();
     }
 
     public void setDomain(int index, int... domain) {

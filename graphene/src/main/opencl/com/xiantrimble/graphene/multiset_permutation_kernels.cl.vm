@@ -1,0 +1,105 @@
+\#include "./multiset_permutation_indices.cl.vm?uniqueElements=$uniqueElements[0]"
+\#include "./typed_arrays.cl.vm?type=int&fromScope=global&toScope="
+
+typedef struct {
+    int size; // size of the problem
+    int uniqueElements; // number of unique elements
+} PermutationSizeContext;
+
+/*
+ * Computes the size of a permutation.
+ */
+kernel void multiset_permutation_sizes( global PermutationSizeContext* context, global int* multisets, global long* sizes ) {
+	int i = get_global_id(0);
+	
+	if( i < context->size ) {
+	    long offset = i * ${uniqueElements[0]};
+		int multiset[${uniqueElements[0]}];
+		copy_int_global_general(multisets+offset, multiset, 0, ${uniqueElements[0]});
+		sizes[i] = multiset_permutation_size_${uniqueElements[0]}(multiset);
+	}
+}
+
+typedef struct {
+    int size; // size of the problem
+    int uniqueElements; // number of unique elements
+    int subsetSize; // number of elements in each result.
+} CombinatoricContext;
+
+/*
+ * Expands the specified permutation indices to their element forms.
+ * 
+ * context - information about the combinatoric being expanded.
+ * indices - an array of indices to expand.
+ * elements - the output of the expansion.
+ */
+
+kernel void expand_perm_lr( global CombinatoricContext* context, global int* domain, global long* indices, global int* elements )
+{
+	int i = get_global_id(0);
+	
+	if( i < context->size ) {
+		int multiset[${uniqueElements[0]}];
+		for( int m = 0; m < ${uniqueElements[0]}; m++ ) {
+			multiset[m] = domain[m];
+		}
+		
+		long index = indices[i];
+		
+		// for each element...
+		for( int e = 0; e < context->subsetSize; e++ ) {
+			
+			// iterate over the multiset, testing the end of it's 
+			// bounds is past the index.
+			for( int m = 0; m < ${uniqueElements[0]}; m++ ) {
+			  int remaining = multiset[m];
+			  if( remaining == 0 ) continue;
+				  multiset[m]--;
+				  long size = multiset_permutation_size_${uniqueElements[0]}(multiset);
+				  if( size > index ) {
+					  elements[(i*context->subsetSize)+e] = m;
+					  break;
+				  }
+				  else {
+					multiset[m]++;
+			        index-=size;
+				  }
+			  }
+		}
+	}
+}
+
+kernel void index_perm_lr( global CombinatoricContext* context, global int* domain, global long* indices, global int* elements )
+{
+	int i = get_global_id(0);
+	
+	if( i < context->size ) {
+		int multiset[${uniqueElements[0]}];
+		for( int m = 0; m < ${uniqueElements[0]}; m++ ) {
+			multiset[m] = domain[m];
+		}
+		
+		int index = 0;
+		
+		// for each element...
+		for( int e = 0; e < context->subsetSize; e++ ) {
+			int element = elements[(i*context->subsetSize)+e];
+			
+			// iterate over the multiset, testing the end of it's 
+			// bounds is past the index.
+			for( int m = 0; m < ${uniqueElements[0]}; m++ ) {
+				int remaining = multiset[m];
+				if( remaining == 0 ) continue;
+				multiset[m]--;
+				if( m < element ) {
+					index += multiset_permutation_size_${uniqueElements[0]}(multiset);
+					multiset[m]++;
+				}
+				else {
+					break;
+				}
+			  }
+		}
+		indices[i] = index;
+	}
+}

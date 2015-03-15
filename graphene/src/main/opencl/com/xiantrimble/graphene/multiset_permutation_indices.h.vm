@@ -1,0 +1,10 @@
+\#include "./factorial.h"
+
+#ifndef MULTISET_PERMUTATIONS_${uniqueElements[0]}
+\#define MULTISET_PERMUTATIONS_${uniqueElements[0]}
+
+long multiset_permutation_size_${uniqueElements[0]}( int* domain );
+void multiset_permutation_elements_${uniqueElements[0]}( int* domain, long index, global int* elements, long subsetSize );
+long multiset_permutation_indices_${uniqueElements[0]}( int* domain, global int* elements, long subsetSize );
+
+#endif

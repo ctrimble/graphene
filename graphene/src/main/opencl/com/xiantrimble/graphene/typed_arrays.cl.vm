@@ -1,0 +1,19 @@
+#if( !$toScope )#set( $toScope = [""] )#end
+#if( !$fromScope )#set( $fromScope = [""] )#end
+#if( $toScope[0] == "" )#set( $toLabel = "general" )#else#set( $toLabel = $toScope[0] )#end
+#if( $fromScope[0] == "" )#set( $fromLabel = "general" )#else#set( $fromLabel = $fromScope[0] )#end
+#set( $label = "${type[0]}_${fromLabel}_${toLabel}" )
+
+#ifndef TYPED_ARRAYS_COPY_$label
+\#define TYPED_ARRAYS_COPY_$label
+void copy_$label( ${fromScope[0]} ${type[0]}* from, ${toScope[0]} ${type[0]}* to, int offset, int length );
+#endif
+
+#ifndef TYPED_ARRAYS_COPY_$label_IMPL
+\#define TYPED_ARRAYS_COPY_$label_IMPL
+void copy_$label( ${fromScope[0]} ${type[0]}* from, ${toScope[0]} ${type[0]}* to, int offset, int length ) {
+	for( int m = offset; m < offset + length; m++ ) {
+		to[m] = from[m];
+	}
+}
+#endif

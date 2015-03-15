@@ -1,0 +1,91 @@
+\#include "./multiset_permutation_indices.h.vm?uniqueElements=$uniqueElements[0]"
+\#include "./typed_arrays.cl.vm?type=int&fromScope=global"
+
+\#include "./factorial.cl"
+\#include "./index_range.cl"
+
+long multiset_permutation_size_${uniqueElements[0]}( int* multiset ) {
+	long total = 0;
+	long denum = 1;
+	for( int i = 0; i < ${uniqueElements[0]}; i++ ) {
+		int count = multiset[i];
+		total += count;
+		denum *= factorial(count);
+	}
+	return factorial(total)/denum;
+}
+
+void multiset_permutation_elements_${uniqueElements[0]}( int* domain, long index, global int* elements, long subsetSize ) { 
+	
+	for( int e = 0; e < subsetSize; e++ ) {
+	
+	// iterate over the multiset, testing the end of it's 
+	// bounds is past the index.
+
+	for( int m = 0; m < ${uniqueElements[0]}; m++ ) {
+	  int remaining = domain[m];
+	  if( remaining == 0 ) continue;
+	      domain[m]--;
+		  long size = multiset_permutation_size_${uniqueElements[0]}(domain);
+		  if( size > index ) {
+			  elements[e] = m;
+			  break;
+		  }
+		  else {
+			domain[m]++;
+	        index-=size;
+		  }
+	  }
+  }
+}
+
+void multiset_permutation_elements_${uniqueElements[0]}_general( int* domain, long index, int* elements, long subsetSize ) { 
+	
+	for( int e = 0; e < subsetSize; e++ ) {
+	
+	// iterate over the multiset, testing the end of it's 
+	// bounds is past the index.
+
+	for( int m = 0; m < ${uniqueElements[0]}; m++ ) {
+	  int remaining = domain[m];
+	  if( remaining == 0 ) continue;
+	      domain[m]--;
+		  long size = multiset_permutation_size_${uniqueElements[0]}(domain);
+		  if( size > index ) {
+			  elements[e] = m;
+			  break;
+		  }
+		  else {
+			domain[m]++;
+	        index-=size;
+		  }
+	  }
+  }
+}
+
+
+long multiset_permutation_indices_${uniqueElements[0]}( int* domain, global int* elements, long subsetSize ) {
+	
+	long index = 0;
+		
+		// for each element...
+		for( int e = 0; e < subsetSize; e++ ) {
+			int element = elements[e];
+			
+			// iterate over the multiset, testing the end of it's 
+			// bounds is past the index.
+			for( int m = 0; m < ${uniqueElements[0]}; m++ ) {
+				int remaining = domain[m];
+				if( remaining == 0 ) continue;
+				domain[m]--;
+				if( m < element ) {
+					index += multiset_permutation_size_${uniqueElements[0]}(domain);
+					domain[m]++;
+				}
+				else {
+					break;
+				}
+			  }
+		}
+		return index;
+}
